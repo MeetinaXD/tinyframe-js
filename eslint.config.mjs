@@ -13,13 +13,6 @@ export default antfu({
       }],
     },
   },
-  vue: {
-    overrides: {
-      'vue/block-order': ['error', {
-        order: ['template', 'script', 'style'],
-      }],
-    },
-  },
   ignores: [
     'dist/**',
     'node_modules/**',
