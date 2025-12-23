@@ -1,0 +1,44 @@
+{
+  "name": "tinyframe",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "TinyFrame",
+  "author": "cpsdqs",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./checksum": {
+      "types": "./dist/checksum.d.ts",
+      "import": "./dist/checksum.mjs",
+      "require": "./dist/checksum.cjs",
+      "default": "./dist/checksum.mjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "LICENSE",
+    "README.md",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^6.7.3",
+    "eslint": "^9.39.2",
+    "eslint-plugin-format": "^1.1.0",
+    "tsdown": "^0.18.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  }
+}
