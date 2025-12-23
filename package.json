@@ -3,7 +3,11 @@
   "type": "module",
   "version": "1.0.0",
   "description": "TinyFrame",
-  "author": "cpsdqs",
+  "author": {
+    "name": "MeetinaXD",
+    "email": "meetinaxd@icloud.com",
+    "url": "https://github.com/MeetinaXD"
+  },
   "license": "MIT",
   "exports": {
     ".": {
