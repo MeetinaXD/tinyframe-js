@@ -3,7 +3,7 @@ import type { TinyFrameChecksum } from './checksum.js'
 import checksum from './checksum.js'
 
 /**
- * TinyFrame 解析过程中的内部状态
+ * Internal parser states used by TinyFrame
  */
 export type TinyFrameState
   = | 'sof'
@@ -15,7 +15,7 @@ export type TinyFrameState
     | 'datacksum'
 
 /**
- * TinyFrame 支持的输入数据类型
+ * Supported TinyFrame input types
  */
 export type TinyFrameDataLike
   = | Uint8Array
@@ -24,23 +24,23 @@ export type TinyFrameDataLike
     | Iterable<number>
 
 /**
- * TinyFrame 回调签名
+ * TinyFrame callback signature
  */
 export type TinyFrameListenerCallback = (frame: TinyFrame, message: Message) => void
 
 /**
- * TinyFrame 监听器配置
+ * TinyFrame listener configuration
  */
 export interface TinyFrameListener {
   /**
-   * 满足条件时调用的回调
+   * Callback invoked when the condition matches
    */
   callback: TinyFrameListenerCallback
 }
 
 /**
- * 将输入数据转为 Uint8Array，便于统一处理
- * @param data - 任意受支持的缓冲区
+ * Convert supported input to a Uint8Array for easier handling
+ * @param data - Any supported buffer
  */
 function toUint8Array(data: TinyFrameDataLike): Uint8Array {
   if (data instanceof Uint8Array) {
@@ -63,11 +63,11 @@ function toUint8Array(data: TinyFrameDataLike): Uint8Array {
 }
 
 /**
- * 以大端格式写入整数，模仿 Node.js Buffer 的行为
- * @param target - 目标缓冲区
- * @param offset - 写入偏移
- * @param value - 需要写入的无符号整数
- * @param byteLength - 占用字节数
+ * Write an integer in big endian order similar to Node.js Buffer
+ * @param target - Destination buffer
+ * @param offset - Write offset
+ * @param value - Unsigned integer to write
+ * @param byteLength - Number of bytes
  */
 function writeUIntBE(target: Uint8Array, offset: number, value: number, byteLength: number): number {
   let current = value >>> 0
@@ -80,8 +80,8 @@ function writeUIntBE(target: Uint8Array, offset: number, value: number, byteLeng
 }
 
 /**
- * 拼接多个 Uint8Array
- * @param chunks - 需要合并的片段
+ * Concatenate multiple Uint8Arrays
+ * @param chunks - Fragments to merge
  */
 function concatUint8(...chunks: Uint8Array[]): Uint8Array {
   const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
@@ -97,8 +97,8 @@ function concatUint8(...chunks: Uint8Array[]): Uint8Array {
 }
 
 /**
- * 将输入转为 Iterable<number>，供 parser 循环消费
- * @param buffer - 外部缓冲区
+ * Convert input to Iterable<number> for the parser
+ * @param buffer - External buffer
  */
 function asIterable(buffer: TinyFrameDataLike): Iterable<number> {
   if (buffer instanceof ArrayBuffer) {
@@ -117,30 +117,41 @@ function asIterable(buffer: TinyFrameDataLike): Iterable<number> {
   throw new TypeError('Input must be iterable or an ArrayBuffer/typed array')
 }
 
+function safeCallback<T extends (...args: any[]) => any>(fn: T): T {
+  return function (...args) {
+    try {
+      return fn(...args)
+    }
+    catch (e) {
+      console.error(e)
+    }
+  } as T
+}
+
 /**
- * TinyFrame 消息对象，封装帧信息与数据
+ * TinyFrame message encapsulating frame metadata and payload
  */
 export class Message {
   /**
-   * TinyFrame 分配的帧 ID
+   * Frame ID assigned by TinyFrame
    */
   frameID: number
   /**
-   * 自定义类型字段
+   * Custom type field
    */
   type: number
   /**
-   * 消息载荷
+   * Message payload
    */
   data: Uint8Array
   /**
-   * 是否为回应帧
+   * Indicates whether this is a response frame
    */
   isResponse: boolean
 
   /**
-   * @param type - 自定义消息类型
-   * @param data - 原始载荷
+   * @param type - Custom message type
+   * @param data - Raw payload
    */
   constructor(type: number, data: TinyFrameDataLike) {
     this.frameID = 0
@@ -150,7 +161,7 @@ export class Message {
   }
 
   /**
-   * 保持与旧版 `message.id` 兼容
+   * Backwards compatible alias for `message.id`
    */
   get id(): number {
     return this.frameID
@@ -161,8 +172,8 @@ export class Message {
   }
 
   /**
-   * 快速构造回应消息
-   * @param data - 回应载荷
+   * Quickly create a response message
+   * @param data - Response payload
    */
   createResponse(data: TinyFrameDataLike): Message {
     const message = new Message(this.type, data)
@@ -185,52 +196,52 @@ interface TypedListenerEntry {
 }
 
 /**
- * TinyFrame 主状态机，负责收发与解析帧
+ * TinyFrame state machine handling TX/RX and parsing
  */
 export class TinyFrame {
   /**
-   * 远端角色（1 为从机，0 为主机）
+   * Peer role (1 for slave, 0 for master)
    */
   peer: number
   /**
-   * 下一帧待分配的 ID
+   * Next frame ID to allocate
    */
   nextID: number
   /**
-   * 当前解析状态
+   * Current parser state
    */
   state: TinyFrameState
   /**
-   * 解析器运行以来的 tick 数
+   * Number of ticks since the parser started
    */
   parserTimeoutTicks: number
   /**
-   * Tick 超时阈值，null 禁用
+   * Tick timeout threshold, null disables it
    */
   parserTimeout: number | null
   /**
-   * 帧起始字节，未设置则无 SOF
+   * SOF byte if set, otherwise SOF-less
    */
   sofByte: number | null
   /**
-   * 发送分片大小
+   * Chunk size when sending
    */
   chunkSize: number
   /**
-   * 当前校验器，null 表示关闭
+   * Current checksum handler, null disables checksum
    */
   checksum: TinyFrameChecksum | null
 
   /**
-   * 帧 ID 字段长度（字节）
+   * Frame ID field length (bytes)
    */
   idSize: number
   /**
-   * 数据长度字段长度（字节）
+   * Data length field size (bytes)
    */
   lenSize: number
   /**
-   * 类型字段长度（字节）
+   * Type field size (bytes)
    */
   typeSize: number
 
@@ -246,20 +257,20 @@ export class TinyFrame {
   private genericListeners: TinyFrameListener[]
 
   /**
-   * 具体传输层写函数，需要由使用者赋值
+   * Transport write function provided by the user
    */
   write: (buffer: Uint8Array) => void
   /**
-   * 开始发送前的钩子（用于仲裁总线等）
+   * Hook before TX starts (e.g. bus arbitration)
    */
   claimTx: () => void
   /**
-   * 发送完成后的钩子
+   * Hook after TX completes
    */
   releaseTx: () => void
 
   /**
-   * @param peer - 主/从角色标识（0=主，1=从）
+   * @param peer - Role identifier (0=master, 1=slave)
    */
   constructor(peer = 1) {
     this.peer = peer
@@ -294,7 +305,7 @@ export class TinyFrame {
   }
 
   /**
-   * 重置解析器状态
+   * Reset parser state
    */
   resetParser(): void {
     this.state = 'sof'
@@ -302,17 +313,17 @@ export class TinyFrame {
   }
 
   /**
-   * 取得下一个帧 ID
+   * Get the next frame ID
    */
   getNextID(): number {
     return this.nextID++
   }
 
   /**
-   * 注册 ID 监听器，可选超时 tick
-   * @param id - 目标帧 ID
-   * @param callback - 对应帧 ID 的监听器
-   * @param timeout - 超时 tick，null 表示不超时
+   * Register an ID listener with optional timeout ticks
+   * @param id - Target frame ID
+   * @param callback - Listener for the frame ID
+   * @param timeout - Timeout ticks, null disables timeout
    */
   addIDListener(id: number, callback: TinyFrameListener, timeout: number | null = null): void {
     this.idListeners.push({
@@ -324,8 +335,8 @@ export class TinyFrame {
   }
 
   /**
-   * 将监听器的剩余时长恢复到初始值
-   * @param callback - 需要续期的监听器
+   * Renew a listener timeout back to its initial value
+   * @param callback - Listener to renew
    */
   renewIDListener(callback: TinyFrameListener): void {
     for (const listener of this.idListeners) {
@@ -336,9 +347,9 @@ export class TinyFrame {
   }
 
   /**
-   * 注册指定类型的监听器
-   * @param type - 消息类型
-   * @param callback - 回调
+   * Register a listener for a specific type
+   * @param type - Message type
+   * @param callback - Callback
    */
   addTypeListener(type: number, callback: TinyFrameListener): void {
     this.typeListeners.push({
@@ -348,16 +359,16 @@ export class TinyFrame {
   }
 
   /**
-   * 注册通用监听器
-   * @param callback - 回调
+   * Register a generic listener
+   * @param callback - Callback
    */
   addGenericListener(callback: TinyFrameListener): void {
     this.genericListeners.push(callback)
   }
 
   /**
-   * 按回调引用移除 ID 监听器
-   * @param callback - 监听器引用
+   * Remove an ID listener by callback reference
+   * @param callback - Listener reference
    */
   removeIDListener(callback: TinyFrameListener): void {
     const index = this.idListeners.findIndex(listener => listener.callback === callback)
@@ -367,8 +378,8 @@ export class TinyFrame {
   }
 
   /**
-   * 按回调引用移除类型监听器
-   * @param callback - 监听器引用
+   * Remove a type listener by callback reference
+   * @param callback - Listener reference
    */
   removeTypeListener(callback: TinyFrameListener): void {
     const index = this.typeListeners.findIndex(listener => listener.callback === callback)
@@ -378,8 +389,8 @@ export class TinyFrame {
   }
 
   /**
-   * 移除通用监听器
-   * @param callback - 监听器引用
+   * Remove a generic listener
+   * @param callback - Listener reference
    */
   removeGenericListener(callback: TinyFrameListener): void {
     const index = this.genericListeners.indexOf(callback)
@@ -389,8 +400,8 @@ export class TinyFrame {
   }
 
   /**
-   * 根据消息内容构建 TinyFrame 帧头
-   * @param message - 待发送消息
+   * Compose the TinyFrame header based on the message
+   * @param message - Message to send
    */
   composeHead(message: Message): Uint8Array {
     let id = message.isResponse ? message.frameID : this.getNextID()
@@ -428,10 +439,10 @@ export class TinyFrame {
   }
 
   /**
-   * 发送一帧，可附带一次性监听器
-   * @param message - 待发送的消息
-   * @param callback - 回应监听器
-   * @param timeout - 超时 tick
+   * Send a frame, optionally attaching a one-shot listener
+   * @param message - Message to send
+   * @param callback - Response listener
+   * @param timeout - Timeout ticks
    */
   sendFrame(message: Message, callback?: TinyFrameListener, timeout: number | null = null): void {
     this.claimTx()
@@ -463,26 +474,26 @@ export class TinyFrame {
   }
 
   /**
-   * 发送消息，不等待回应
-   * @param message - 待发送的消息
+   * Send a message without waiting for a response
+   * @param message - Message to send
    */
   send(message: Message): void {
     this.sendFrame(message)
   }
 
   /**
-   * 发送消息并监听回应
-   * @param message - 待发送的请求
-   * @param listener - 响应监听器
-   * @param timeout - 超时 tick
+   * Send a message and listen for the response
+   * @param message - Request to send
+   * @param listener - Response listener
+   * @param timeout - Timeout ticks
    */
   query(message: Message, listener: TinyFrameListener, timeout: number | null = null): void {
     this.sendFrame(message, listener, timeout)
   }
 
   /**
-   * 发送回应消息，沿用原帧 ID
-   * @param message - 回应内容
+   * Send a response message reusing the frame ID
+   * @param message - Response payload
    */
   respond(message: Message): void {
     message.isResponse = true
@@ -491,8 +502,8 @@ export class TinyFrame {
   }
 
   /**
-   * 将外部缓冲区全部送入解析器
-   * @param buffer - 外部缓冲区
+   * Feed an external buffer into the parser
+   * @param buffer - External buffer
    */
   accept(buffer: TinyFrameDataLike): void {
     for (const byte of asIterable(buffer)) {
@@ -501,7 +512,7 @@ export class TinyFrame {
   }
 
   /**
-   * 初始化帧解析所需的字段
+   * Initialize parsing for a new frame
    */
   beginFrame(): void {
     this.state = 'id'
@@ -514,8 +525,8 @@ export class TinyFrame {
   }
 
   /**
-   * 逐字节地推进状态机
-   * @param byte - 新收到的字节
+   * Advance the state machine byte by byte
+   * @param byte - Newly received byte
    */
   acceptByte(byte: number): void {
     if (typeof this.parserTimeout === 'number' && Number.isFinite(this.parserTimeout)) {
@@ -589,8 +600,8 @@ export class TinyFrame {
 
         if (++this.partLen === this.len) {
           if (!this.checksum) {
-            this.handleReceived()
             this.resetParser()
+            this.handleReceived()
             break
           }
           else {
@@ -603,18 +614,17 @@ export class TinyFrame {
       case 'datacksum':
         this.cksum = ((this.cksum << 8) | byte) >>> 0
         if (++this.partLen === (this.checksum?.size ?? 0)) {
+          this.resetParser()
           if (this.checksum && this.checksum.sum(this.data) === this.cksum) {
             this.handleReceived()
           }
-
-          this.resetParser()
         }
         break
     }
   }
 
   /**
-   * 解析成功后构建消息并触发监听器
+   * Build the message and notify listeners after parsing succeeds
    */
   handleReceived(): void {
     const message = new Message(this.currentType, this.data)
@@ -622,23 +632,23 @@ export class TinyFrame {
 
     for (const listener of this.idListeners.slice()) {
       if (listener.id === message.frameID) {
-        listener.callback.callback(this, message)
+        safeCallback(listener.callback.callback)(this, message)
       }
     }
 
     for (const listener of this.typeListeners.slice()) {
       if (listener.type === message.type) {
-        listener.callback.callback(this, message)
+        safeCallback(listener.callback.callback)(this, message)
       }
     }
 
     for (const listener of this.genericListeners.slice()) {
-      listener.callback(this, message)
+      safeCallback(listener.callback)(this, message)
     }
   }
 
   /**
-   * 推进内部 tick，移除超时监听器
+   * Advance internal ticks and remove timed-out listeners
    */
   tick(): void {
     this.parserTimeoutTicks++

@@ -1,17 +1,17 @@
 /**
- * TinyFrame 校验器接口
+ * TinyFrame checksum interface
  */
 export interface TinyFrameChecksum {
   /**
-   * 校验器名称
+   * Checksum name
    */
   name: string
   /**
-   * 计算缓冲区校验值
+   * Calculate the checksum of a buffer
    */
   sum: (buffer: Iterable<number>) => number
   /**
-   * 校验值字节数
+   * Number of checksum bytes
    */
   size: number
 }
@@ -97,7 +97,7 @@ const CRC32_TABLE = [
 /* eslint-enable */
 
 /**
- * 查表计算单步 CRC8
+ * Look up table for a single CRC8 step
  */
 function crc8Bits(data: number): number {
   let crc = 0
@@ -121,7 +121,7 @@ function crc8Bits(data: number): number {
 }
 
 /**
- * 异或校验（默认）
+ * XOR checksum (default)
  */
 const xor: TinyFrameChecksum = {
   name: 'xor',
@@ -138,7 +138,7 @@ const xor: TinyFrameChecksum = {
 }
 
 /**
- * CRC8 校验
+ * CRC8 checksum
  */
 const crc8: TinyFrameChecksum = {
   name: 'crc8',
@@ -155,7 +155,7 @@ const crc8: TinyFrameChecksum = {
 }
 
 /**
- * CRC16 校验
+ * CRC16 checksum
  */
 const crc16: TinyFrameChecksum = {
   name: 'crc16',
@@ -172,7 +172,7 @@ const crc16: TinyFrameChecksum = {
 }
 
 /**
- * CRC32 校验
+ * CRC32 checksum
  */
 const crc32: TinyFrameChecksum = {
   name: 'crc32',
